@@ -242,3 +242,34 @@
 - 資料匯出／匯入
 - 可設定的工作時段及顯示範圍
 - 雲端同步（若使用者未來有跨裝置需求）
+
+---
+
+## 14. Firebase 與 Google 登入需求增補（v0.2）
+
+### 14.1 需求變更
+
+使用者提出加入 Google 登入，並使用 Firebase。產品方向由純本機單機使用擴充為可登入及跨裝置同步；未登入時仍可使用本機模式。
+
+### 14.2 新增功能需求
+
+- **FR-08 Google 登入：**使用 Firebase Authentication 的 Google provider 登入及登出。
+- **FR-09 使用者資料隔離：**登入後任務及分類以 Firebase Authentication UID 作為資料擁有者識別；使用者不可存取其他 UID 的資料。
+- **FR-10 雲端同步：**登入後載入該 UID 的任務與分類；新增、編輯、完成、刪除及分類變更後同步至 Cloud Firestore。
+- **FR-11 本機模式：**未登入時保留瀏覽器本機儲存及既有操作。登入後應明確說明雲端資料與原本本機資料的處理方式，不能無提示覆蓋任一方資料。
+- **FR-12 認證狀態呈現：**介面顯示目前登入使用者／本機模式與登入、登出操作。
+
+### 14.3 建議 Firestore 結構
+
+`users/{uid}/app/data` 文件包含 `tasks`、`categories` 及 `updatedAt`。此為 MVP 的整份資料文件方案，適合個人少量資料；若資料量或多人協作需求增加，再改為每個 task/category 獨立文件。
+
+### 14.4 安全及設定需求
+
+- Firestore Security Rules 必須限制 `request.auth.uid == userId`。
+- Firebase Web API config 可由前端讀取，但仍需正確設定 Authentication Authorized Domains 與 Firestore Rules；不可將 Admin SDK 私密金鑰放進前端。
+- Firebase Web app config 應由部署環境注入或本機設定檔提供，避免提交使用者專案設定檔。
+- Google 登入需要在 Firebase Console 啟用 Google Authentication provider。
+
+### 14.5 遷移待確認
+
+首次 Google 登入時若本機已有資料、雲端也已有資料，需先定義遷移策略（採用雲端、採用本機或合併）。目前實作應避免靜默覆蓋，正式啟用雲端同步前需完成此決策。

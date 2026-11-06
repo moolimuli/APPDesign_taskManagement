@@ -1,0 +1,5 @@
+# Firebase app config (local deployment config)
+firebase-config.js
+
+# OS/editor
+.DS_Store
