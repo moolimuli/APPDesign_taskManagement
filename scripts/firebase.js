@@ -12,7 +12,14 @@ import {
   getDoc,
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-import { firebaseConfig } from "../firebase-config.js";
+// Firebase is optional: the app should still start in local mode when a
+// deployment does not include its private, per-environment config module.
+let firebaseConfig;
+try {
+  ({ firebaseConfig } = await import("../firebase-config.js"));
+} catch {
+  ({ firebaseConfig } = await import("../firebase-config.example.js"));
+}
 
 const isConfigured = Boolean(
   firebaseConfig.apiKey &&

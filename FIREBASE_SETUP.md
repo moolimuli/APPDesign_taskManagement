@@ -1,6 +1,6 @@
 # Firebase / Google 登入設定
 
-目前程式碼已整合 Firebase Authentication（Google provider）與 Cloud Firestore。請使用你自己的 Firebase 專案完成以下設定；此專案尚未收到 Firebase Web app config，因此登入功能在填入設定前會顯示為本機模式。
+目前程式碼已整合 Firebase Authentication（Google provider）與 Cloud Firestore。沒有 `firebase-config.js` 時，程式會改用範例設定並以本機模式啟動；要使用 Google 登入及雲端同步，請使用自己的 Firebase 專案完成以下設定。
 
 ## 1. 建立 Firebase Web app
 
