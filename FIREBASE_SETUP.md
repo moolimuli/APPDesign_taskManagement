@@ -7,7 +7,7 @@
 1. 在 Firebase Console 建立或選取專案。
 2. 到 Project settings → General → Your apps，新增 Web app。
 3. 複製 Firebase 提供的 Web app config。
-4. 複製 `firebase-config.example.js` 為 `firebase-config.js`，填入真實值。此檔已加入 `.gitignore`，不會被 Git 提交。
+4. 複製 `firebase-config.example.js` 為 `firebase-config.js`，填入真實值。本專案是靜態前端，執行及部署時都需要這份 Web app client config；它會隨網站提供給瀏覽器，不可在其中放入 service-account 金鑰或其他伺服器私密資料。
 
 ## 2. 啟用 Google Authentication
 
@@ -33,8 +33,11 @@ python3 -m http.server 8000
 
 ## 5. 部署
 
-把靜態檔部署到 GitHub Pages 後，確認 Pages 網域已加入 Firebase Authentication Authorized domains。不要提交 `firebase-config.js`，需在部署環境以安全的建置／部署步驟產生此檔。Firebase Web config 本身不是伺服器私鑰，但仍應配合嚴格 Firestore Security Rules 與網域設定。
+把靜態檔部署到 GitHub Pages 後，確認 Pages 網域已加入 Firebase Authentication Authorized domains。`firebase-config.js` 是供瀏覽器使用的 Web app 設定，Pages 部署必須包含此檔；Firestore Security Rules 與授權網域才是資料存取的主要限制。不要將 Firebase Admin SDK service-account 金鑰放入前端檔案。
 
-## 資料同步注意
+## 資料同步規則
 
-登入後，應載入該 Google 使用者 UID 下的 Firestore 資料；登入前本機資料與雲端資料合併規則尚待產品決策。不要以不透明的覆蓋方式處理首次登入資料遷移。
+- 未登入時，任務只存於目前瀏覽器的 `localStorage`；訪客修改不會寫入 Firestore。
+- 登入後若該 Google 帳號已有 Firestore 資料，雲端資料是此帳號的來源，會載入並取代目前瀏覽器的本機資料，不再顯示本機／雲端衝突視窗。
+- 若該帳號尚無雲端資料，但本機已有任務，首次登入會詢問是否匯入。選擇匯入會上傳本機資料；選擇取消會以空白行程開始，並取代目前瀏覽器中的本機行程。
+- 登出後的變更只留在本機。再次登入已有資料的帳號時，會重新載入該帳號的雲端資料。
