@@ -7,4 +7,4 @@ export const firebaseConfig = {
   appId: "1:116174006682:web:3d38b7faabb3ab7be6b223"
 };
 
-export const recaptchaEnterpriseKey = "YOUR_RECAPTCHA_ENTERPRISE_KEY";
+export const recaptchaEnterpriseKey = "6LcAwCwuAAAAAFxTXxZ82pjHmew4PKXSBwRLJ-0X";
