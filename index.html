@@ -63,6 +63,8 @@ body{font-size:15px}
 #appShell .group-add,#appShell .category-footer{min-height:48px;padding:12px 16px;border-radius:12px}
 #appShell .week-schedule{grid-template-columns:60px repeat(7,minmax(140px,1fr))}
 #appShell .week-col{min-width:140px}
+#appShell .week-schedule>.week-col:first-child{width:60px;min-width:0}
+#appShell .week-unscheduled{display:none}
 #appShell .week-time{height:82px}
 #appShell .week-daybody{height:984px;background:repeating-linear-gradient(to bottom,transparent 0,transparent 81px,#f0f2f0 81px,#f0f2f0 82px)}
 #appShell .week-event{min-height:56px;padding:12px 16px;border-radius:10px}
