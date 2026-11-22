@@ -30,8 +30,9 @@ body{font-size:15px}
 #appShell:not(.task-view) .schedule{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden;margin-top:18px}
 #appShell .schedule>.section-title,#appShell .schedule>.daybar{flex:none}
 #calendarArea{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-#appShell.task-view main #taskPage{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden;margin-top:20px}
-#categoryGroups{flex:1;min-height:0;overflow-y:auto;align-content:start;gap:14px;padding:0 4px 8px 0;overscroll-behavior:contain}
+#appShell.task-view>main{display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+#appShell.task-view main #taskPage{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;overflow:hidden;margin-top:20px}
+#categoryGroups{min-height:0;overflow-y:auto;overflow-x:hidden;align-content:start;grid-auto-rows:max-content;gap:14px;padding:0 4px 8px 0;overscroll-behavior:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch}
 #appShell .category-footer{flex:none;margin-top:12px}
 #appShell>.rightbar{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:24px 20px}
 #appShell.task-view>.rightbar{display:none}
