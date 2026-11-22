@@ -1,7 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-ai.js";
 import { app } from "./firebase.js";
 
-const AI_MODEL = "gemini-4-hydrogen";
+const AI_MODEL = "gemini-3.8-flash";
 
 const systemInstruction = `你是「日序」App 的行程小幫手，一律用繁體中文回答。
 只能根據使用者提供的任務資料回答；資料裡沒有的就說沒有，不要編造。
