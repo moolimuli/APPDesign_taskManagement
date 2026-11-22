@@ -133,6 +133,30 @@ body .toast-undo{font-size:13px;border-radius:10px;padding:8px 12px}
  #appShell:not(.task-view)>.rightbar{padding-top:7px;padding-bottom:7px}
  #appShell:not(.task-view)>.rightbar>.quick-box{padding:12px 16px}
 }
+.ai-assistant-launcher{position:fixed;right:24px;bottom:22px;z-index:70;padding:13px 18px;border-radius:14px;background:var(--green);color:#fff;font-size:15px;font-weight:600;box-shadow:0 8px 26px #20382a30}
+.ai-assistant-launcher:hover{background:#1e5946}
+.ai-assistant-backdrop{position:fixed;inset:0;z-index:74;background:#202a2b66}
+.ai-assistant-panel{position:fixed;z-index:75;top:0;right:0;bottom:0;width:min(440px,100vw);display:flex;flex-direction:column;background:#fff;box-shadow:-12px 0 40px #202a2b24;transform:translateX(102%);transition:transform .24s ease}
+.ai-assistant-panel.open{transform:translateX(0)}
+.ai-assistant-panel[hidden],.ai-assistant-backdrop[hidden],.ai-assistant-launcher[hidden]{display:none}
+.ai-assistant-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line);flex:none}
+.ai-assistant-header h2{margin:0;font-size:17px;font-weight:600}
+.ai-assistant-close{height:36px;width:36px;border-radius:10px;background:#f1f3f2;color:#4f5954;font-size:22px;line-height:1}
+.ai-assistant-privacy{flex:none;margin:0;padding:11px 20px;background:#f7f8f7;color:#737d78;font-size:12px;line-height:1.5}
+.ai-assistant-messages{display:flex;flex:1;min-height:0;flex-direction:column;gap:12px;overflow-y:auto;padding:18px 16px;background:#fff;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.ai-assistant-bubble{max-width:88%;padding:12px 14px;border-radius:14px;font-size:15px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-assistant-bubble.user{align-self:flex-end;background:var(--green);color:#fff;border-bottom-right-radius:5px}
+.ai-assistant-bubble.assistant{align-self:flex-start;background:#f0f2f1;color:#303a35;border-bottom-left-radius:5px}
+.ai-assistant-shortcuts{display:grid;gap:8px;padding:12px 16px 4px;border-top:1px solid var(--line);flex:none}
+.ai-assistant-shortcut{padding:10px 12px;border:1px solid #e3e8e5;border-radius:12px;background:#fff;color:#45514b;text-align:left;font-size:15px}
+.ai-assistant-shortcut:hover{background:#f5f7f5}
+.ai-assistant-shortcut:disabled{opacity:.55;cursor:wait}
+.ai-assistant-composer{display:flex;align-items:flex-end;gap:10px;padding:12px 16px 18px;flex:none}
+.ai-assistant-composer textarea{flex:1;height:88px;min-height:88px;max-height:88px;resize:none;padding:12px 14px;border:1px solid #dfe5e1;border-radius:12px;outline:0;font-family:inherit;font-size:15px;line-height:1.5;color:var(--ink)}
+.ai-assistant-composer textarea:focus{border-color:#8eaa98;box-shadow:0 0 0 3px #e8f2eb}
+.ai-assistant-send{height:44px;padding:0 16px;border-radius:12px;background:var(--green);color:#fff;font-size:15px;font-weight:600;white-space:nowrap}
+.ai-assistant-send:disabled{opacity:.55;cursor:wait}
+@media(max-width:600px){.ai-assistant-launcher{right:14px;bottom:14px}.ai-assistant-header{padding:14px 16px}.ai-assistant-privacy{padding:10px 16px}.ai-assistant-messages{padding:14px 12px}.ai-assistant-shortcuts{padding:10px 12px 4px}.ai-assistant-composer{padding:10px 12px 14px}}
 
 </style>
 </head>
@@ -163,6 +187,22 @@ body .toast-undo{font-size:13px;border-radius:10px;padding:8px 12px}
     <button class="primary auth-login-button" id="loginButton" type="button" disabled>使用 Google 登入</button>
   </section>
 </div>
+<button class="ai-assistant-launcher" id="assistantLauncher" type="button" hidden>✦ AI 小幫手</button>
+<div class="ai-assistant-backdrop" id="assistantBackdrop" hidden></div>
+<aside class="ai-assistant-panel" id="assistantPanel" aria-label="AI 小幫手" aria-hidden="true" hidden>
+  <div class="ai-assistant-header"><h2>AI 小幫手</h2><button class="ai-assistant-close" id="assistantClose" type="button" aria-label="關閉 AI 小幫手">✕</button></div>
+  <p class="ai-assistant-privacy">問題與你的任務清單會傳送至 Google Gemini 處理，對話不會儲存。</p>
+  <div class="ai-assistant-messages" id="assistantMessages" aria-live="polite" aria-relevant="additions text"></div>
+  <div class="ai-assistant-shortcuts">
+    <button class="ai-assistant-shortcut" type="button" data-assistant-question="今天有哪些行程？">今天有哪些行程？</button>
+    <button class="ai-assistant-shortcut" type="button" data-assistant-question="這週還有哪些沒完成？">這週還有哪些沒完成？</button>
+    <button class="ai-assistant-shortcut" type="button" data-assistant-question="幫我找今天的空檔">幫我找今天的空檔</button>
+  </div>
+  <form class="ai-assistant-composer" id="assistantForm">
+    <textarea id="assistantQuestion" aria-label="輸入問題" placeholder="詢問你的行程…"></textarea>
+    <button class="ai-assistant-send" id="assistantSend" type="submit">送出</button>
+  </form>
+</aside>
 <div class="modal-backdrop" id="modalBackdrop"><div class="modal"><div class="modal-head"><h2 id="modalTitle">新增任務</h2><button class="close" id="closeModal">×</button></div><form id="taskForm"><div class="form-grid">
 <div class="field full"><label for="fTitle">任務名稱 *</label><input id="fTitle" required maxlength="100" placeholder="例如：整理本週專案進度" /></div>
 <div class="field"><label for="fCategory">分類</label><div class="category-controls"><select id="fCategory"><option value="">未分類</option></select><input id="newCategory" placeholder="＋ 新增分類" maxlength="20" /></div></div>
@@ -174,6 +214,7 @@ body .toast-undo{font-size:13px;border-radius:10px;padding:8px 12px}
 <div class="toast" id="toast"></div>
 <script type="module">
 import { isConfigured, auth, onAuthStateChanged, signInWithGoogle, signOutUser, loadUserData, saveUserData } from "./scripts/firebase.js";
+import { startConversation, clearConversation, askAssistant } from "./scripts/ai.js";
 (()=>{
 const $=s=>document.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
 try{localStorage.removeItem('dayflow_tasks');localStorage.removeItem('dayflow_categories')}catch{}
@@ -190,8 +231,8 @@ async function persistPendingCloudSave(){if(cloudSavePromise){await cloudSavePro
 async function flushPendingCloudSave(){clearTimeout(saveTimer);saveTimer=null;await persistPendingCloudSave()}
 function showLoginGate(message,buttonText='使用 Google 登入',disabled=!isConfigured){$('#appShell').hidden=true;$('#authGate').hidden=false;$('#authMessage').textContent=message;$('#loginButton').textContent=buttonText;$('#loginButton').disabled=disabled}
 function setAuthUI(user){const name=user.displayName||user.email||'已登入';$('#menuName').textContent=name;$('#menuEmail').textContent=user.email||'';$('#avatarInitial').textContent=Array.from(name.trim())[0]||'U';const photo=$('#avatarPhoto');photo.onerror=()=>{photo.hidden=true;$('#avatarInitial').hidden=false};if(user.photoURL){photo.src=user.photoURL;photo.hidden=false;$('#avatarInitial').hidden=true}else{photo.removeAttribute('src');photo.hidden=true;$('#avatarInitial').hidden=false}$('#storageNote').textContent='資料同步至 Firebase'}
-function resetToLogin(message=isConfigured?'請使用 Google 登入以繼續':'Firebase 尚未設定'){clearTimeout(saveTimer);saveTimer=null;pendingCloudSave=null;currentUser=null;cloudReadyUserId=null;tasks=[];categories=[];showLoginGate(message,'使用 Google 登入',!isConfigured)}
-async function handleAuthChange(user){const token=++cloudLoadToken;cloudReadyUserId=null;if(!user){resetToLogin();return}currentUser=user;tasks=[];categories=[];setAuthUI(user);showLoginGate('正在載入雲端資料…','載入中…',true);try{const data=await loadUserData(user.uid);if(token!==cloudLoadToken||currentUser?.uid!==user.uid)return;if(data){tasks=Array.isArray(data.tasks)?data.tasks:[];categories=Array.isArray(data.categories)?data.categories:[...DEFAULT_CATEGORIES]}else{tasks=[];categories=[...DEFAULT_CATEGORIES];await saveUserData(user.uid,{tasks,categories});if(token!==cloudLoadToken||currentUser?.uid!==user.uid)return}cloudReadyUserId=user.uid;update();$('#authGate').hidden=true;$('#appShell').hidden=false}catch(e){if(token!==cloudLoadToken)return;cloudReadyUserId=null;showLoginGate('無法載入雲端資料，請重試。','重試載入',false);toast('讀取雲端資料失敗：'+e.message)}}
+function resetToLogin(message=isConfigured?'請使用 Google 登入以繼續':'Firebase 尚未設定'){closeAssistantPanel();$('#assistantLauncher').hidden=true;clearTimeout(saveTimer);saveTimer=null;pendingCloudSave=null;currentUser=null;cloudReadyUserId=null;tasks=[];categories=[];showLoginGate(message,'使用 Google 登入',!isConfigured)}
+async function handleAuthChange(user){const token=++cloudLoadToken;cloudReadyUserId=null;if(!user){resetToLogin();return}currentUser=user;tasks=[];categories=[];setAuthUI(user);showLoginGate('正在載入雲端資料…','載入中…',true);try{const data=await loadUserData(user.uid);if(token!==cloudLoadToken||currentUser?.uid!==user.uid)return;if(data){tasks=Array.isArray(data.tasks)?data.tasks:[];categories=Array.isArray(data.categories)?data.categories:[...DEFAULT_CATEGORIES]}else{tasks=[];categories=[...DEFAULT_CATEGORIES];await saveUserData(user.uid,{tasks,categories});if(token!==cloudLoadToken||currentUser?.uid!==user.uid)return}cloudReadyUserId=user.uid;update();$('#authGate').hidden=true;$('#appShell').hidden=false;$('#assistantLauncher').hidden=false}catch(e){if(token!==cloudLoadToken)return;cloudReadyUserId=null;showLoginGate('無法載入雲端資料，請重試。','重試載入',false);toast('讀取雲端資料失敗：'+e.message)}}
 const sortTasks=a=>a.sort((x,y)=>({high:0,medium:1,low:2}[x.priority]-({high:0,medium:1,low:2}[y.priority])||(x.start||'99:99').localeCompare(y.start||'99:99')));
 function categoryColor(category){if(!category)return {bg:'#f0f2f1',border:'#a5aeaa',text:'#6f7974'};const index=categories.indexOf(category);return index<0?{bg:'#f0f2f1',border:'#a5aeaa',text:'#6f7974'}:CATEGORY_COLORS[index%CATEGORY_COLORS.length]}
 function categoryVisible(task){return !hiddenCalendarCategories.has(task.category||'')}
@@ -249,7 +290,7 @@ function openModal(){editingId=null;lastValidTimeDuration=null;$('#taskForm').re
 function openEdit(id){let t=tasks.find(x=>x.id===id);if(!t)return;editingId=id;$('#taskForm').reset();$('#modalTitle').textContent='編輯任務';$('#fTitle').value=t.title;refreshCategories();$('#fCategory').value=t.category||'';$('#fDate').value=t.date||'';$('#fStart').value=t.start||'';$('#fEnd').value=t.end||'';$('#fPriority').value=t.priority;$('#fNote').value=t.note||'';rememberTimeDuration();$('#deleteTask').style.visibility='visible';$('#modalBackdrop').classList.add('open')}
 function closeModal(){$('#modalBackdrop').classList.remove('open')}
 function openQuickDetails(){const draft=$('#quickTitle').value.trim();openModal();if(draft){$('#fTitle').value=draft;$('#quickTitle').value=''}}
-$('#addTask').onclick=$('#quickDetails').onclick=openQuickDetails;$('#closeModal').onclick=closeModal;$('#modalBackdrop').onclick=e=>{if(e.target===$('#modalBackdrop'))closeModal()};document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();setAccountMenuOpen(false)}});
+$('#addTask').onclick=$('#quickDetails').onclick=openQuickDetails;$('#closeModal').onclick=closeModal;$('#modalBackdrop').onclick=e=>{if(e.target===$('#modalBackdrop'))closeModal()};document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();setAccountMenuOpen(false);closeAssistantPanel()}});
 $('#fStart').addEventListener('input',adjustEndAfterStartChange);$('#fStart').addEventListener('change',adjustEndAfterStartChange);$('#fEnd').addEventListener('input',rememberTimeDuration);$('#fEnd').addEventListener('change',rememberTimeDuration);
 $('#taskForm').onsubmit=e=>{e.preventDefault();let title=$('#fTitle').value.trim();if(!title)return;let nc=$('#newCategory').value.trim();if(nc&&!categories.includes(nc)){categories.push(nc);save()}let category=nc||$('#fCategory').value;let item={id:editingId||crypto.randomUUID(),title,category,date:$('#fDate').value||selectedDate,start:$('#fStart').value,end:$('#fEnd').value,priority:$('#fPriority').value,note:$('#fNote').value.trim(),done:editingId?!!tasks.find(t=>t.id===editingId)?.done:false};if(item.start&&item.end&&item.end<item.start){toast('結束時間需晚於開始時間');return}if(editingId){tasks=tasks.map(t=>t.id===editingId?item:t);toast('任務已更新')}else{tasks.push(item);toast('任務已加入')}save();closeModal();update()};
 $('#deleteTask').onclick=()=>{if(editingId)deleteTaskById(editingId)};
@@ -260,9 +301,20 @@ $('#prevDay').onclick=()=>{let d=new Date(selectedDate+'T12:00:00');d.setDate(d.
 $$('.nav button[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;selectedDate=today;update()});
 $('#newCategoryName').onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const name=e.currentTarget.value.trim();if(!name){toast('分類名稱不可為空');return}if(categories.includes(name)){toast('分類已存在');return}categories.push(name);e.currentTarget.value='';save();update();$('#newCategoryName').focus();toast('分類已建立')};
 
+let assistantRequestToken=0,assistantBusy=false,assistantCloseTimer=null;
+function appendAssistantBubble(kind,text,extraClass=''){const bubble=document.createElement('div');bubble.className=`ai-assistant-bubble ${kind}${extraClass?' '+extraClass:''}`;bubble.textContent=text;$('#assistantMessages').append(bubble);$('#assistantMessages').scrollTop=$('#assistantMessages').scrollHeight;return bubble}
+function setAssistantBusy(busy){assistantBusy=busy;$('#assistantQuestion').disabled=busy;$('#assistantSend').disabled=busy;$$('.ai-assistant-shortcut').forEach(button=>button.disabled=busy)}
+function closeAssistantPanel(){assistantRequestToken++;setAssistantBusy(false);clearTimeout(assistantCloseTimer);assistantCloseTimer=null;const panel=$('#assistantPanel');panel.classList.remove('open');panel.setAttribute('aria-hidden','true');$('#assistantBackdrop').hidden=true;$('#assistantMessages').replaceChildren();$('#assistantQuestion').value='';clearConversation();if(panel.hidden)return;assistantCloseTimer=setTimeout(()=>{panel.hidden=true;assistantCloseTimer=null},260)}
+function openAssistantPanel(){if($('#assistantLauncher').hidden)return;clearTimeout(assistantCloseTimer);assistantCloseTimer=null;const panel=$('#assistantPanel');panel.hidden=false;$('#assistantBackdrop').hidden=false;panel.setAttribute('aria-hidden','false');$('#assistantMessages').replaceChildren();$('#assistantQuestion').value='';setAssistantBusy(false);requestAnimationFrame(()=>panel.classList.add('open'));try{startConversation()}catch(error){console.error(error);const message=/app[\s_-]*check|recaptcha|re[\s_-]*captcha/i.test(String(error?.message||error))?'AI 驗證失敗，請重新整理頁面。':'暫時無法回答，請稍後再試。';appendAssistantBubble('assistant',message)}setTimeout(()=>$('#assistantQuestion').focus(),80)}
+async function sendAssistantQuestion(value=$('#assistantQuestion').value){const question=value.trim();if(!question||assistantBusy)return;const requestToken=++assistantRequestToken;appendAssistantBubble('user',question);$('#assistantQuestion').value='';setAssistantBusy(true);const thinking=appendAssistantBubble('assistant','思考中…','thinking');try{const answer=await askAssistant(question,tasks,today);if(requestToken!==assistantRequestToken)return;thinking.remove();appendAssistantBubble('assistant',answer)}catch(error){console.error('AI 小幫手回覆失敗：',error);if(requestToken!==assistantRequestToken)return;thinking.remove();const message=/app[\s_-]*check|recaptcha|re[\s_-]*captcha/i.test(String(error?.message||error))?'AI 驗證失敗，請重新整理頁面。':'暫時無法回答，請稍後再試。';appendAssistantBubble('assistant',message)}finally{if(requestToken===assistantRequestToken)setAssistantBusy(false)}}
+$('#assistantLauncher').onclick=openAssistantPanel;$('#assistantClose').onclick=closeAssistantPanel;$('#assistantBackdrop').onclick=closeAssistantPanel;
+$$('.ai-assistant-shortcut').forEach(button=>button.onclick=()=>sendAssistantQuestion(button.dataset.assistantQuestion));
+$('#assistantForm').onsubmit=event=>{event.preventDefault();sendAssistantQuestion()};
+$('#assistantQuestion').onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAssistantQuestion()}};
+
 $('#loginButton').onclick=async()=>{if(!isConfigured){showLoginGate('Firebase 尚未設定','使用 Google 登入',true);return}const button=$('#loginButton');button.disabled=true;try{if(currentUser)await handleAuthChange(currentUser);else await signInWithGoogle()}catch(e){showLoginGate('登入失敗，請重試。','使用 Google 登入',false);toast('登入失敗：'+e.message)}finally{if(!currentUser||cloudReadyUserId!==currentUser.uid)button.disabled=false}};
 function setAccountMenuOpen(open){$('#accountMenu').hidden=!open;$('#avatarButton').setAttribute('aria-expanded',String(open))}
-$('#avatarButton').onclick=()=>setAccountMenuOpen($('#accountMenu').hidden);$('#menuSignOut').onclick=async()=>{const button=$('#menuSignOut');button.disabled=true;setAccountMenuOpen(false);showLoginGate('正在儲存並登出…','處理中…',true);try{await flushPendingCloudSave();await signOutUser();resetToLogin()}catch(e){$('#appShell').hidden=false;$('#authGate').hidden=true;if(pendingCloudSave)save();toast('登出未完成：'+e.message)}finally{button.disabled=false}};document.addEventListener('click',e=>{if(!$('#accountArea').contains(e.target))setAccountMenuOpen(false)});
+$('#avatarButton').onclick=()=>setAccountMenuOpen($('#accountMenu').hidden);$('#menuSignOut').onclick=async()=>{const button=$('#menuSignOut');button.disabled=true;setAccountMenuOpen(false);closeAssistantPanel();$('#assistantLauncher').hidden=true;showLoginGate('正在儲存並登出…','處理中…',true);try{await flushPendingCloudSave();await signOutUser();resetToLogin()}catch(e){$('#appShell').hidden=false;$('#authGate').hidden=true;$('#assistantLauncher').hidden=false;if(pendingCloudSave)save();toast('登出未完成：'+e.message)}finally{button.disabled=false}};document.addEventListener('click',e=>{if(!$('#accountArea').contains(e.target))setAccountMenuOpen(false)});
 if(isConfigured)onAuthStateChanged(auth,user=>handleAuthChange(user));else resetToLogin('Firebase 尚未設定');
 $('#allTasksBtn').onclick=()=>{$('[data-view="inbox"]').click()};$('#sortBtn').onclick=()=>toast('待辦依優先度排序');
 })();

@@ -35,6 +35,16 @@ python3 -m http.server 8000
 
 把靜態檔部署到 GitHub Pages 後，確認 Pages 網域已加入 Firebase Authentication Authorized domains。`firebase-config.js` 是供瀏覽器使用的 Web app 設定，Pages 部署必須包含此檔；Firestore Security Rules 與授權網域才是資料存取的主要限制。不要將 Firebase Admin SDK service-account 金鑰放入前端檔案。
 
+## 6. Firebase AI Logic 與 App Check
+
+1. 在 Firebase Console 啟用 Firebase AI Logic，並選用 Gemini Developer API。也可在已連結正確 Firebase 專案的目錄執行 `firebase init ailogic`，以啟用 AI Logic 服務。
+2. 在 Google Cloud Console 的 Fraud Defense／reCAPTCHA Enterprise 建立網站金鑰。選擇網站金鑰，不要把 `localhost` 或 `127.0.0.1` 加入允許網域，也不要勾選核取方塊驗證。
+3. 在 Firebase Console → App Check → Apps 選取此 Web app，使用 reCAPTCHA Enterprise 註冊，填入剛建立的網站金鑰。
+4. 將網站金鑰填入 `firebase-config.js` 的 `recaptchaEnterpriseKey`。範例檔的佔位值 `YOUR_RECAPTCHA_ENTERPRISE_KEY` 不能用於正式驗證。
+5. 本機以 `http://localhost` 或 `http://127.0.0.1` 測試時，程式會開啟 App Check debug token。第一次啟動後，從瀏覽器 console 複製產生的 token，到 Firebase Console → App Check → Apps → Manage debug tokens 註冊。切勿將實際 debug token 提交到版本控制。
+
+AI 小幫手每次詢問都會將問題與目前任務資料傳送至 Google Gemini；關閉面板或登出時，畫面與記憶體中的對話會清空。
+
 ## 資料同步規則
 
 - 未登入時，任務只存於目前瀏覽器的 `localStorage`；訪客修改不會寫入 Firestore。

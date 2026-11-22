@@ -1,24 +1,30 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
 import {
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
   signOut
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
 import {
   getFirestore,
   doc,
   getDoc,
   setDoc
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider
+} from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app-check.js";
+
 // Firebase is optional: the app should still start in local mode when a
 // deployment does not include its private, per-environment config module.
 let firebaseConfig;
+let recaptchaEnterpriseKey;
 try {
-  ({ firebaseConfig } = await import("../firebase-config.js"));
+  ({ firebaseConfig, recaptchaEnterpriseKey } = await import("../firebase-config.js"));
 } catch {
-  ({ firebaseConfig } = await import("../firebase-config.example.js"));
+  ({ firebaseConfig, recaptchaEnterpriseKey } = await import("../firebase-config.example.js"));
 }
 
 const isConfigured = Boolean(
@@ -28,19 +34,32 @@ const isConfigured = Boolean(
   !firebaseConfig.apiKey.startsWith("YOUR_")
 );
 
+let app = null;
 let auth;
 let db;
 let provider;
 
 if (isConfigured) {
-  const app = initializeApp(firebaseConfig);
+  if (
+    typeof location !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(location.hostname) &&
+    typeof self !== "undefined"
+  ) {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
+  app = initializeApp(firebaseConfig);
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(recaptchaEnterpriseKey),
+    isTokenAutoRefreshEnabled: true
+  });
   auth = getAuth(app);
   db = getFirestore(app);
   provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 }
 
-export { isConfigured, auth, db, onAuthStateChanged };
+export { app, isConfigured, auth, db, onAuthStateChanged };
 
 export async function signInWithGoogle() {
   if (!isConfigured) throw new Error("Firebase 尚未設定，請建立 firebase-config.js。");

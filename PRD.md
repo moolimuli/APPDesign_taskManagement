@@ -258,6 +258,7 @@
 - **FR-10 雲端同步：**登入後載入該 UID 的任務與分類；新增、編輯、完成、刪除及分類變更後同步至 Cloud Firestore。
 - **FR-11 必須登入：**使用者必須先以 Google 登入才能使用產品；任務與分類只儲存在 Cloud Firestore，不提供本機模式。
 - **FR-12 認證狀態呈現：**介面顯示目前登入使用者／本機模式與登入、登出操作。
+- **FR-13 AI 小幫手：**登入後可使用 Firebase AI Logic（Gemini Developer API）根據任務資料進行唯讀問答；問題與任務清單會傳送至 Google Gemini，AI 不得新增、修改或刪除任務。對話僅保留於記憶體，關閉面板或登出時清除，不寫入 Firestore 或 `localStorage`。
 
 ### 14.3 建議 Firestore 結構
 
