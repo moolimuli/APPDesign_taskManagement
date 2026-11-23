@@ -104,11 +104,13 @@ ${question}`;
     result = await chat.sendMessage(prompt);
   } catch (primaryError) {
     if (activeModelName !== AI_MODEL || !canUseFallback(primaryError)) throw primaryError;
+    console.warn(`AI 主模型 ${AI_MODEL} 請求失敗，改用 ${AI_FALLBACK_MODEL} 重試。`, primaryError);
     try {
       startConversation(AI_FALLBACK_MODEL, history);
       result = await chat.sendMessage(prompt);
       usedFallback = true;
     } catch (fallbackError) {
+      console.error(`AI 備援模型 ${AI_FALLBACK_MODEL} 也無法回覆。`, fallbackError);
       startConversation(AI_MODEL, history);
       throw fallbackError;
     }
