@@ -33,8 +33,7 @@ const taskProposalTool = {
 
 const ai = app
   ? getAI(app, {
-      backend: new GoogleAIBackend(),
-      useLimitedUseAppCheckTokens: true
+      backend: new GoogleAIBackend()
     })
   : null;
 const modelCache = new Map();
@@ -50,35 +49,66 @@ function getModel(modelName) {
   return modelCache.get(modelName);
 }
 
-let chat = null;
-let activeModelName = AI_MODEL;
+let history = [];
 
-export function startConversation(modelName = AI_MODEL, history = []) {
-  const model = getModel(modelName);
+export function startConversation() {
+  const model = getModel(AI_MODEL);
   if (!model) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
-  activeModelName = modelName;
-  chat = model.startChat({ history });
-  return chat;
+  history = [];
+  return model;
 }
 
 export function clearConversation() {
-  chat = null;
-  activeModelName = AI_MODEL;
+  history = [];
 }
 
 function canUseFallback(error) {
   const detail = `${error?.code || ""} ${error?.message || error || ""}`;
-  return /429|resource[\s_-]*exhausted|overload|high[\s_-]*demand|500(?=.*(?:high[\s_-]*demand|overload))|503|unavailable|load failed|network|failed to fetch|網路連線|連線中斷/i.test(detail);
+  if (/429|resource[\s_-]*exhausted/i.test(detail)) return false;
+  return /\b500\b|\b503\b|high[\s_-]*demand|overload|unavailable/i.test(detail);
+}
+
+function content(role, text) {
+  return { role, parts: [{ text }] };
+}
+
+function rememberTurn(question, answer) {
+  history.push(content("user", question), content("model", answer));
+  history = history.slice(-6);
+}
+
+function logAIError(label, error, method = console.error) {
+  method(label, {
+    code: error?.code ?? "",
+    message: error?.message ?? String(error),
+    error
+  });
+}
+
+function formatDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 export async function askAssistant(question, tasks, todayString, categories = []) {
-  if (!chat) startConversation();
+  const primaryModel = getModel(AI_MODEL);
+  if (!primaryModel) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
 
   const todayDate = new Date(`${todayString}T12:00:00`);
   const weekday = Number.isNaN(todayDate.getTime())
     ? "星期不明"
     : new Intl.DateTimeFormat("zh-TW", { weekday: "long" }).format(todayDate);
-  const taskData = (Array.isArray(tasks) ? tasks : []).map(task => ({
+  const rangeStart = new Date(todayDate);
+  rangeStart.setDate(rangeStart.getDate() - 7);
+  const rangeEnd = new Date(todayDate);
+  rangeEnd.setDate(rangeEnd.getDate() + 30);
+  const startDate = formatDate(rangeStart);
+  const endDate = formatDate(rangeEnd);
+  const taskData = (Array.isArray(tasks) ? tasks : [])
+    .filter(task => {
+      const date = typeof task.date === "string" ? task.date : "";
+      return !date || (date >= startDate && date <= endDate);
+    })
+    .map(task => ({
     title: task.title ?? "",
     category: task.category || "未分類",
     date: task.date ?? "",
@@ -86,7 +116,7 @@ export async function askAssistant(question, tasks, todayString, categories = []
     end: task.end ?? "",
     priority: task.priority ?? "",
     done: Boolean(task.done),
-    note: task.note ?? ""
+    note: Array.from(String(task.note ?? "")).slice(0, 80).join("")
   }));
   const prompt = `今天日期與星期：${todayString}（${weekday}）
 任務清單 JSON：
@@ -97,35 +127,39 @@ ${JSON.stringify(Array.isArray(categories) ? categories : [])}
 
 使用者問題：
 ${question}`;
+  const contents = [...history, content("user", prompt)];
   let result;
   let usedFallback = false;
-  const history = await chat.getHistory();
   try {
-    result = await chat.sendMessage(prompt);
+    result = await primaryModel.generateContent({ contents });
   } catch (primaryError) {
-    if (activeModelName !== AI_MODEL || !canUseFallback(primaryError)) throw primaryError;
-    console.warn(`AI 主模型 ${AI_MODEL} 請求失敗，改用 ${AI_FALLBACK_MODEL} 重試。`, primaryError);
+    if (!canUseFallback(primaryError)) throw primaryError;
+    logAIError(`AI 主模型 ${AI_MODEL} 請求失敗，改用 ${AI_FALLBACK_MODEL} 重試。`, primaryError, console.warn);
     try {
-      startConversation(AI_FALLBACK_MODEL, history);
-      result = await chat.sendMessage(prompt);
+      const fallbackModel = getModel(AI_FALLBACK_MODEL);
+      if (!fallbackModel) throw new Error("Firebase 尚未設定，無法啟動 AI 備援模型。");
+      result = await fallbackModel.generateContent({ contents });
       usedFallback = true;
     } catch (fallbackError) {
-      console.error(`AI 備援模型 ${AI_FALLBACK_MODEL} 也無法回覆。`, fallbackError);
-      startConversation(AI_MODEL, history);
+      logAIError(`AI 備援模型 ${AI_FALLBACK_MODEL} 也無法回覆。`, fallbackError);
       throw fallbackError;
     }
   }
-  const calls = result.response.functionCalls();
-  if (!calls.length) return { type: "text", text: result.response.text(), usedFallback };
+  const calls = result.response.functionCalls() ?? [];
+  if (!calls.length) {
+    const text = result.response.text();
+    rememberTurn(question, text);
+    return { type: "text", text, usedFallback };
+  }
 
   if (calls.length !== 1 || calls[0].name !== "proposeCreateTask") {
-    clearConversation();
-    return { type: "text", text: "這次只能提出一筆新增任務，請分次提出。", usedFallback };
+    const text = "這次只能提出一筆新增任務，請分次提出。";
+    rememberTurn(question, text);
+    return { type: "text", text, usedFallback };
   }
 
   const call = calls[0];
-  // The app handles the proposal locally after explicit confirmation. Discard
-  // this chat because its last model turn contains an unresolved function call.
-  clearConversation();
+  const title = typeof call.args?.title === "string" ? call.args.title : "未命名任務";
+  rememberTurn(question, `（已提出新增任務提案：${title}）`);
   return { type: "create-task-proposal", task: call.args, usedFallback };
 }
