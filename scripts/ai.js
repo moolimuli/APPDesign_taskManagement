@@ -83,23 +83,13 @@ ${question}`;
   if (!calls.length) return { type: "text", text: result.response.text() };
 
   if (calls.length !== 1 || calls[0].name !== "proposeCreateTask") {
-    const rejected = await chat.sendMessage(calls.map(call => ({
-      type: "functionResponse",
-      functionResponse: {
-        name: call.name,
-        response: { status: "rejected", reason: "This stage supports one create proposal per request." }
-      }
-    })));
-    return { type: "text", text: rejected.response.text() || "這次只能提出一筆新增任務。" };
+    clearConversation();
+    return { type: "text", text: "這次只能提出一筆新增任務，請分次提出。" };
   }
 
   const call = calls[0];
-  await chat.sendMessage([{
-    type: "functionResponse",
-    functionResponse: {
-      name: call.name,
-      response: { status: "awaiting_user_confirmation", message: "No task has been created. The app is displaying a proposal for user approval." }
-    }
-  }]);
+  // The app handles the proposal locally after explicit confirmation. Discard
+  // this chat because its last model turn contains an unresolved function call.
+  clearConversation();
   return { type: "create-task-proposal", task: call.args };
 }
