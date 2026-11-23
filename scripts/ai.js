@@ -68,7 +68,7 @@ export function clearConversation() {
 
 function canUseFallback(error) {
   const detail = `${error?.code || ""} ${error?.message || error || ""}`;
-  return /429|resource[\s_-]*exhausted|overload|503|unavailable|load failed|network|failed to fetch|網路連線|連線中斷/i.test(detail);
+  return /429|resource[\s_-]*exhausted|overload|high[\s_-]*demand|500(?=.*(?:high[\s_-]*demand|overload))|503|unavailable|load failed|network|failed to fetch|網路連線|連線中斷/i.test(detail);
 }
 
 export async function askAssistant(question, tasks, todayString, categories = []) {
