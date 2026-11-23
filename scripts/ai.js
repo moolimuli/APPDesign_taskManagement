@@ -1,8 +1,8 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, Schema } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-ai.js";
 import { app } from "./firebase.js";
 
-const AI_MODEL = "gemini-3.8-flash";
-const AI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
+const AI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-4-hydrogen"];
+const AI_EXHAUSTED_KEY = "dayflow_ai_exhausted";
 
 const systemInstruction = `你是「日序」App 的行程小幫手，一律用繁體中文回答。
 只能根據使用者提供的任務資料回答；資料裡沒有的就說沒有，不要編造。
@@ -50,29 +50,75 @@ function getModel(modelName) {
 }
 
 let history = [];
+let conversationVersion = 0;
 
 export function startConversation() {
-  const model = getModel(AI_MODEL);
+  const model = getModel(AI_MODELS[0]);
   if (!model) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
-  history = [];
   return model;
 }
 
 export function clearConversation() {
   history = [];
+  conversationVersion++;
 }
 
-function canUseFallback(error) {
-  const detail = `${error?.code || ""} ${error?.message || error || ""}`;
-  if (/429|resource[\s_-]*exhausted/i.test(detail)) return false;
-  return /\b500\b|\b503\b|high[\s_-]*demand|overload|unavailable/i.test(detail);
+function errorDetail(error) {
+  return `${error?.code || ""} ${error?.message || error || ""}`;
+}
+
+function isPerDay429(error) {
+  const detail = errorDetail(error);
+  return /\b429\b/i.test(detail) && /perday/i.test(detail);
+}
+
+function shouldTryNextModel(error) {
+  const detail = errorDetail(error);
+  if (/app[\s_-]*check|recaptcha|re[\s_-]*captcha/i.test(detail)) return false;
+  return /429|resource[\s_-]*exhausted|\b500\b|\b503\b|high[\s_-]*demand|overload|unavailable/i.test(detail);
+}
+
+function getExhaustedModels(todayString) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AI_EXHAUSTED_KEY) || "null");
+    if (saved?.date !== todayString || !Array.isArray(saved.models)) return new Set();
+    return new Set(saved.models.filter(modelName => AI_MODELS.includes(modelName)));
+  } catch {
+    return new Set();
+  }
+}
+
+function markModelExhausted(todayString, modelName, exhaustedModels) {
+  exhaustedModels.add(modelName);
+  try {
+    localStorage.setItem(AI_EXHAUSTED_KEY, JSON.stringify({
+      date: todayString,
+      models: [...exhaustedModels]
+    }));
+  } catch (error) {
+    logAIError("無法儲存今日 AI 額度狀態。", error);
+  }
+}
+
+function createAllModelsPerDayError(lastError) {
+  if (lastError && (typeof lastError === "object" || typeof lastError === "function")) {
+    try {
+      lastError.allModelsPerDay = true;
+      return lastError;
+    } catch {}
+  }
+  const error = new Error("All AI models are exhausted for today (PerDay).");
+  error.code = "AI/all-models-per-day-exhausted";
+  error.allModelsPerDay = true;
+  return error;
 }
 
 function content(role, text) {
   return { role, parts: [{ text }] };
 }
 
-function rememberTurn(question, answer) {
+function rememberTurn(question, answer, requestVersion) {
+  if (requestVersion !== conversationVersion) return;
   history.push(content("user", question), content("model", answer));
   history = history.slice(-6);
 }
@@ -90,10 +136,10 @@ function formatDate(date) {
 }
 
 export async function askAssistant(question, tasks, todayString, categories = []) {
-  const primaryModel = getModel(AI_MODEL);
-  if (!primaryModel) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
+  const requestVersion = conversationVersion;
+  const requestTodayString = formatDate(new Date()) || todayString;
 
-  const todayDate = new Date(`${todayString}T12:00:00`);
+  const todayDate = new Date(`${requestTodayString}T12:00:00`);
   const weekday = Number.isNaN(todayDate.getTime())
     ? "星期不明"
     : new Intl.DateTimeFormat("zh-TW", { weekday: "long" }).format(todayDate);
@@ -109,16 +155,16 @@ export async function askAssistant(question, tasks, todayString, categories = []
       return !date || (date >= startDate && date <= endDate);
     })
     .map(task => ({
-    title: task.title ?? "",
-    category: task.category || "未分類",
-    date: task.date ?? "",
-    start: task.start ?? "",
-    end: task.end ?? "",
-    priority: task.priority ?? "",
-    done: Boolean(task.done),
-    note: Array.from(String(task.note ?? "")).slice(0, 80).join("")
-  }));
-  const prompt = `今天日期與星期：${todayString}（${weekday}）
+      title: task.title ?? "",
+      category: task.category || "未分類",
+      date: task.date ?? "",
+      start: task.start ?? "",
+      end: task.end ?? "",
+      priority: task.priority ?? "",
+      done: Boolean(task.done),
+      note: Array.from(String(task.note ?? "")).slice(0, 80).join("")
+    }));
+  const prompt = `今天日期與星期：${requestTodayString}（${weekday}）
 任務清單 JSON：
 ${JSON.stringify(taskData)}
 
@@ -128,38 +174,52 @@ ${JSON.stringify(Array.isArray(categories) ? categories : [])}
 使用者問題：
 ${question}`;
   const contents = [...history, content("user", prompt)];
+  const exhaustedModels = getExhaustedModels(requestTodayString);
+  const modelsToTry = AI_MODELS.filter(modelName => !exhaustedModels.has(modelName));
+  if (!modelsToTry.length) throw createAllModelsPerDayError();
+
   let result;
-  let usedFallback = false;
-  try {
-    result = await primaryModel.generateContent({ contents });
-  } catch (primaryError) {
-    if (!canUseFallback(primaryError)) throw primaryError;
-    logAIError(`AI 主模型 ${AI_MODEL} 請求失敗，改用 ${AI_FALLBACK_MODEL} 重試。`, primaryError, console.warn);
+  let usedModelName = "";
+  let lastError;
+  for (const [index, modelName] of modelsToTry.entries()) {
+    const model = getModel(modelName);
+    if (!model) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
     try {
-      const fallbackModel = getModel(AI_FALLBACK_MODEL);
-      if (!fallbackModel) throw new Error("Firebase 尚未設定，無法啟動 AI 備援模型。");
-      result = await fallbackModel.generateContent({ contents });
-      usedFallback = true;
-    } catch (fallbackError) {
-      logAIError(`AI 備援模型 ${AI_FALLBACK_MODEL} 也無法回覆。`, fallbackError);
-      throw fallbackError;
+      result = await model.generateContent({ contents });
+      usedModelName = modelName;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (isPerDay429(error)) markModelExhausted(requestTodayString, modelName, exhaustedModels);
+      if (!shouldTryNextModel(error)) {
+        logAIError(`AI 模型 ${modelName} 請求失敗，停止切換模型。`, error);
+        throw error;
+      }
+      logAIError(`AI 模型 ${modelName} 請求失敗，${index < modelsToTry.length - 1 ? "改試下一個模型。" : "已沒有其他可用模型。"}`, error, console.warn);
     }
   }
+  if (!result) {
+    if (AI_MODELS.every(modelName => exhaustedModels.has(modelName))) {
+      throw createAllModelsPerDayError(lastError);
+    }
+    throw lastError;
+  }
+
   const calls = result.response.functionCalls() ?? [];
   if (!calls.length) {
     const text = result.response.text();
-    rememberTurn(question, text);
-    return { type: "text", text, usedFallback };
+    rememberTurn(question, text, requestVersion);
+    return { type: "text", text, modelName: usedModelName };
   }
 
   if (calls.length !== 1 || calls[0].name !== "proposeCreateTask") {
     const text = "這次只能提出一筆新增任務，請分次提出。";
-    rememberTurn(question, text);
-    return { type: "text", text, usedFallback };
+    rememberTurn(question, text, requestVersion);
+    return { type: "text", text, modelName: usedModelName };
   }
 
   const call = calls[0];
   const title = typeof call.args?.title === "string" ? call.args.title : "未命名任務";
-  rememberTurn(question, `（已提出新增任務提案：${title}）`);
-  return { type: "create-task-proposal", task: call.args, usedFallback };
+  rememberTurn(question, `（已提出新增任務提案：${title}）`, requestVersion);
+  return { type: "create-task-proposal", task: call.args, modelName: usedModelName };
 }
