@@ -44,7 +44,7 @@ function getModel(modelName) {
     modelCache.set(modelName, getGenerativeModel(ai, {
       model: modelName,
       systemInstruction,
-      tools: taskProposalTool
+      tools: [taskProposalTool]
     }));
   }
   return modelCache.get(modelName);

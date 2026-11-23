@@ -222,7 +222,7 @@ body .toast-undo{font-size:13px;border-radius:10px;padding:8px 12px}
 <div class="toast" id="toast"></div>
 <script type="module">
 import { isConfigured, auth, onAuthStateChanged, signInWithGoogle, signOutUser, loadUserData, saveUserData } from "./scripts/firebase.js";
-import { startConversation, clearConversation, askAssistant } from "./scripts/ai.js?v=20261123-fallback-debug";
+import { startConversation, clearConversation, askAssistant } from "./scripts/ai.js?v=20261123-tools-array-fix";
 (()=>{
 const $=s=>document.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
 try{localStorage.removeItem('dayflow_tasks');localStorage.removeItem('dayflow_categories')}catch{}
