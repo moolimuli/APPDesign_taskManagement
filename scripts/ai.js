@@ -2,6 +2,7 @@ import { getAI, getGenerativeModel, GoogleAIBackend, Schema } from "https://www.
 import { app } from "./firebase.js";
 
 const AI_MODEL = "gemini-3.8-flash";
+const AI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 
 const systemInstruction = `你是「日序」App 的行程小幫手，一律用繁體中文回答。
 只能根據使用者提供的任務資料回答；資料裡沒有的就說沒有，不要編造。
@@ -36,20 +37,38 @@ const ai = app
       useLimitedUseAppCheckTokens: true
     })
   : null;
-const model = ai
-  ? getGenerativeModel(ai, { model: AI_MODEL, systemInstruction, tools: taskProposalTool })
-  : null;
+const modelCache = new Map();
+function getModel(modelName) {
+  if (!ai) return null;
+  if (!modelCache.has(modelName)) {
+    modelCache.set(modelName, getGenerativeModel(ai, {
+      model: modelName,
+      systemInstruction,
+      tools: taskProposalTool
+    }));
+  }
+  return modelCache.get(modelName);
+}
 
 let chat = null;
+let activeModelName = AI_MODEL;
 
-export function startConversation() {
+export function startConversation(modelName = AI_MODEL, history = []) {
+  const model = getModel(modelName);
   if (!model) throw new Error("Firebase 尚未設定，無法啟動 AI 小幫手。");
-  chat = model.startChat();
+  activeModelName = modelName;
+  chat = model.startChat({ history });
   return chat;
 }
 
 export function clearConversation() {
   chat = null;
+  activeModelName = AI_MODEL;
+}
+
+function canUseFallback(error) {
+  const detail = `${error?.code || ""} ${error?.message || error || ""}`;
+  return /429|resource[\s_-]*exhausted|overload|503|unavailable|load failed|network|failed to fetch|網路連線|連線中斷/i.test(detail);
 }
 
 export async function askAssistant(question, tasks, todayString, categories = []) {
@@ -78,18 +97,33 @@ ${JSON.stringify(Array.isArray(categories) ? categories : [])}
 
 使用者問題：
 ${question}`;
-  const result = await chat.sendMessage(prompt);
+  let result;
+  let usedFallback = false;
+  const history = await chat.getHistory();
+  try {
+    result = await chat.sendMessage(prompt);
+  } catch (primaryError) {
+    if (activeModelName !== AI_MODEL || !canUseFallback(primaryError)) throw primaryError;
+    try {
+      startConversation(AI_FALLBACK_MODEL, history);
+      result = await chat.sendMessage(prompt);
+      usedFallback = true;
+    } catch (fallbackError) {
+      startConversation(AI_MODEL, history);
+      throw fallbackError;
+    }
+  }
   const calls = result.response.functionCalls();
-  if (!calls.length) return { type: "text", text: result.response.text() };
+  if (!calls.length) return { type: "text", text: result.response.text(), usedFallback };
 
   if (calls.length !== 1 || calls[0].name !== "proposeCreateTask") {
     clearConversation();
-    return { type: "text", text: "這次只能提出一筆新增任務，請分次提出。" };
+    return { type: "text", text: "這次只能提出一筆新增任務，請分次提出。", usedFallback };
   }
 
   const call = calls[0];
   // The app handles the proposal locally after explicit confirmation. Discard
   // this chat because its last model turn contains an unresolved function call.
   clearConversation();
-  return { type: "create-task-proposal", task: call.args };
+  return { type: "create-task-proposal", task: call.args, usedFallback };
 }
